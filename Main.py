@@ -1,6 +1,14 @@
-import sqlite3
-from sqlite3 import Error
+import mysql.connector
 
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="root",
+  password="PM4b+GNNx6]1=rX7dVL'BO$mC+Gc34"
+)
+
+print(mydb)
+
+"""
 def create_connection(db_file):
     con = None
     try:
@@ -16,11 +24,6 @@ if __name__ == '__main__':
     create_connection('sqlite.db')
 
 
-
-
-
-
-"""
 con = sqlite3.connect('sqlite.db')
 cur = con.cursor()
 cur.execute('CREATE TABLE users(id PRIMARY KEY, name, avgtime, NA)')
