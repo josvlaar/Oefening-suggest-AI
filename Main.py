@@ -1,32 +1,67 @@
-import mysql.connector
+import sqlite3
+from sqlite3 import Error
 
-mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  password="PM4b+GNNx6]1=rX7dVL'BO$mC+Gc34"
-)
-
-print(mydb)
-
-"""
 def create_connection(db_file):
     con = None
     try:
         con = sqlite3.connect(db_file)
-        print(sqlite3.version)
     except Error as e:
         print(e)
-    finally:
-        if con:
-            con.close()
+    return con
+
+def create_table(con, create_table_sql):
+    try:
+        cur = con.cursor()
+        cur.execute(create_table_sql)
+    except Error as e:
+        print(e)
+
+
+
+
+def main():
+    database = 'sqlite.db'
+
+    sql_create_users = """
+    CREATE TABLE IF NOT EXISTS users (
+        id integer PRIMARY KEY,
+        name text NOT NULL,
+        avgtime integer,
+        numofquestions integer
+    ) """
+    sql_create_questions = """
+    CREATE TABLE IF NOT EXISTS questions (
+        id integer PRIMARY KEY,
+        question text NOT NULL,
+        answerA text NOT NULL,
+        answerB text NOT NULL,
+        answerC text NOT NULL,
+        answerD text NOT NULL,
+        correctanswer text NOT NULL,
+        avgtime integer NOT NULL,
+        numofanswers integer
+    ) """
+    sql_create_answers = """
+    CREATE TABLE IF NOT EXISTS answers (
+        id integer PRIMARY KEY,
+        user_id integer NOT NULL,
+        question_id integer NOT NULL,
+        answer text NOT NULL,
+        timeelapsed integer NOT NULL,
+        factor real NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        FOREIGN KEY (question_id) REFERENCES questions (id)
+    ) """
+
+    con = create_connection(database)
+    if con is not None:
+        create_table(con, sql_create_users)
+        create_table(con, sql_create_questions)
+        create_table(con, sql_create_answers)
+    else:
+        print("Error! cannot create the database connection.")
+
+    
 
 if __name__ == '__main__':
-    create_connection('sqlite.db')
-
-
-con = sqlite3.connect('sqlite.db')
-cur = con.cursor()
-cur.execute('CREATE TABLE users(id PRIMARY KEY, name, avgtime, NA)')
-cur.execute('CREATE TABLE questions(id PRIMARY KEY, question, AA, AB, AC, AD, CA, avgtime, NA)')
-cur.execute('CREATE TABLE answers(id PRIMARY KEY, user_id, question_id, answer, timeelapsed, factor)')
-"""
+    main()
