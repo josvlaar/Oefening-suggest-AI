@@ -4,7 +4,7 @@ mydb = mysql.connector.connect(
   host="localhost",
   user="root",
   password="xh8PXiuYdlb0FurAIUZXKRsvWEctl8",
-  database="test"
+  database="sample1"
 )
 
 starttime = 300
@@ -60,8 +60,8 @@ if not found:
     mycursor.execute(sql, (user,))
     mydb.commit()
 
-numanswers = mycursor.execute("SELECT COUNT(*) FROM answers")
-if numanswers is None:
+numofanswers = mycursor.execute("SELECT COUNT(*) FROM answers")
+if numofanswers is None:
     totalaverage = starttime
     suggestedquestionID = averagequestionID
 else:
