@@ -28,7 +28,6 @@ sql_create_questions = """
         answerD TEXT NOT NULL,
         correctanswer CHAR NOT NULL,
         avgtime FLOAT,
-        penalty FLOAT,
         numofanswers INT
     ) """
 sql_create_answers = """
@@ -114,17 +113,17 @@ print("Questiontuple: ", questiontuple)
 
 if questiontuple is None: exit()
 
-# Reken straftijd uit
+# Reken penalty uit
 penalty = 0
 avgnumofpenalties = 0
-if questiontuple[9] is None: # Vraag is niet eerder gemaakt
+if questiontuple[8] is None: # Vraag is niet eerder gemaakt
     avgnumofpenalties = 1.5
     penalty = totalaveragetime/avgnumofpenalties
 else: # Vraag is eerder gemaakt
     sql = "SELECT COUNT(answer) FROM answers WHERE question_id = %s"
-    cursor.execute(sql, questiontuple[0])
+    cursor.execute(sql, (questiontuple[0],))
     answers = cursor.fetchone()
-    correctanswers = questiontuple[9]
+    correctanswers = questiontuple[8]
     errors = answers[0] - correctanswers
     avgnumofpenalties = errors / correctanswers
     penalty = questiontuple[7] / avgnumofpenalties
@@ -134,22 +133,38 @@ print("Avgnumofpenalties: ", avgnumofpenalties)
 # Vraag maken
 answer = 0
 answers = []
+totaltime = 0
 while answer != questiontuple[6]:
     answer = input("Submit your answer: ")
     timeelapsed = round(float(input("Submit time elapsed before answering: ")), 1)
     answers.append((usertuple[0], questiontuple[0], answer, timeelapsed))
     print("Answers: ", answers)
+    totaltime += timeelapsed
+    if answer != questiontuple[6]: totaltime += penalty
+    totaltime = round(totaltime, 1)
 sql = "INSERT INTO answers (user_id, question_id, answer, timeelapsed) VALUES (%s, %s, %s, %s)"
 cursor.executemany(sql, answers)
 database.commit()
 
 # Database updaten
+sql = "UPDATE questions SET avgtime = %s, numofanswers = %s WHERE id = %s"
+if questiontuple[7] is None:
+    cursor.execute(sql, (totaltime, 1, questiontuple[0]))
+    database.commit()
+else:
+    numofanswers = questiontuple[8]
+    avgtime = questiontuple[7]
+    totaltime = (numofanswers * avgtime + totaltime) / (numofanswers + 1)
+    numofanswers += 1
+    totaltime = round(totaltime, 1)
+    cursor.execute(sql, (totaltime, numofanswers, questiontuple[0]))
+    database.commit()
+sql = "UPDATE users SET avgtime = %s, numofquestions = %s WHERE id = %s"
+if usertuple[2] is None:
+    pass
 
-question_time = 0
-question_num = 0
-user_time = 0
-user_num = 0
 
+"""
 sql = "SELECT COUNT(answer) FROM answers WHERE user_id = %s"
     cursor.execute(sql, usertuple[0])
     totalanswersbyuser = cursor.fetchone()
@@ -162,3 +177,5 @@ sql = "SELECT COUNT(answer) FROM answers WHERE user_id = %s"
     print("Wrongansers: ", wrongansers)
     avgnumofpenalties = wrongansers / numofquestions[0]
     penalty = questiontuple[7] / avgnumofpenalties
+
+"""
