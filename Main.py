@@ -125,7 +125,10 @@ else: # Vraag is eerder gemaakt
     answers = cursor.fetchone()
     correctanswers = questiontuple[8]
     errors = answers[0] - correctanswers
-    avgnumofpenalties = errors / correctanswers
+    if errors == 0: # Nog geen fouten gemaakt bij vraag
+        avgnumofpenalties = 1.5
+    else:   # Wel eerder fouten gemaakt
+        avgnumofpenalties = errors / correctanswers
     penalty = questiontuple[7] / avgnumofpenalties
 print("Penalty: ", penalty)
 print("Avgnumofpenalties: ", avgnumofpenalties)
