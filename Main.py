@@ -41,7 +41,7 @@ sql_create_answers = """
         FOREIGN KEY (question_id) REFERENCES questions(id)
     ) """
 
-cursor = database.cursor()
+cursor = database.cursor(buffered=True)
 cursor.execute(sql_create_users)
 cursor.execute(sql_create_questions)
 cursor.execute(sql_create_answers)
@@ -71,9 +71,9 @@ if usertuple is None:
     usertuple = getusertuple(username)
 
 cursor.execute("SELECT COUNT(numofanswers) FROM questions")
-answeredquestions = cursor.fetchone()
-print("Answered questions: ", answeredquestions)
-if answeredquestions[0] == 0: # Er zijn geen antwoorden
+numofanswers = cursor.fetchone()
+print("Numofanswers: ", numofanswers)
+if numofanswers[0] == 0: # Er zijn geen antwoorden
     totalaveragetime = starttime
     oppositetime = starttime
     suggestedquestionID = averagequestionID
@@ -141,7 +141,6 @@ while answer != questiontuple[6]:
     print("Answers: ", answers)
     totaltime += timeelapsed
     if answer != questiontuple[6]: totaltime += penalty
-    totaltime = round(totaltime, 1)
 sql = "INSERT INTO answers (user_id, question_id, answer, timeelapsed) VALUES (%s, %s, %s, %s)"
 cursor.executemany(sql, answers)
 database.commit()
@@ -154,28 +153,20 @@ if questiontuple[7] is None:
 else:
     numofanswers = questiontuple[8]
     avgtime = questiontuple[7]
-    totaltime = (numofanswers * avgtime + totaltime) / (numofanswers + 1)
+    totalanswertime = (numofanswers * avgtime + totaltime) / (numofanswers + 1)
     numofanswers += 1
-    totaltime = round(totaltime, 1)
-    cursor.execute(sql, (totaltime, numofanswers, questiontuple[0]))
+    totalanswertime = round(totalanswertime, 1)
+    cursor.execute(sql, (totalanswertime, numofanswers, questiontuple[0]))
     database.commit()
 sql = "UPDATE users SET avgtime = %s, numofquestions = %s WHERE id = %s"
 if usertuple[2] is None:
-    pass
-
-
-"""
-sql = "SELECT COUNT(answer) FROM answers WHERE user_id = %s"
-    cursor.execute(sql, usertuple[0])
-    totalanswersbyuser = cursor.fetchone()
-    print("Total answers by user: ", totalanswersbyuser)
-    sql = "SELECT numofquestions FROM users WHERE id = %s"
-    cursor.execute(sql, usertuple[0])
-    numofquestions = cursor.fetchone()
-    print("Numofquestions: ", numofquestions)
-    wrongansers = totalanswersbyuser[0] - numofquestions[0]
-    print("Wrongansers: ", wrongansers)
-    avgnumofpenalties = wrongansers / numofquestions[0]
-    penalty = questiontuple[7] / avgnumofpenalties
-
-"""
+    cursor.execute(sql, (totaltime, 1, usertuple[0]))
+    database.commit()
+else:
+    numofquestions = usertuple[3]
+    avgtime = usertuple[2]
+    totalquestiontime = (numofquestions * avgtime + totaltime) / (numofquestions + 1)
+    numofquestions += 1
+    totalquestiontime = round(totalquestiontime, 1)
+    cursor.execute(sql, (totalquestiontime, numofquestions, usertuple[0]))
+    database.commit()
