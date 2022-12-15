@@ -1,5 +1,6 @@
 import mysql.connector
 
+# Connect to database
 database = mysql.connector.connect(
   host="localhost",
   user="root",
@@ -7,9 +8,11 @@ database = mysql.connector.connect(
   database="sample1"
 )
 
+# Default values for first question
 starttime = 300
 averagequestionID = 1
 
+# Create database tables if they don't exist yet
 sql_create_users = """
     CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -41,17 +44,20 @@ sql_create_answers = """
         FOREIGN KEY (question_id) REFERENCES questions(id)
     ) """
 
+# Create cursor and execute SQL create statements
 cursor = database.cursor(buffered=True)
 cursor.execute(sql_create_users)
 cursor.execute(sql_create_questions)
 cursor.execute(sql_create_answers)
 
+# Global variables
 totalaveragetime = 0
 oppositetime = 0
 suggestedquestionID = 0
 usertuple = 0
 questiontuple = 0
 
+# Helper functions
 def getusertuple(name):
     sql = "SELECT * FROM users WHERE name = %s"
     cursor.execute(sql, (name,))
@@ -62,6 +68,7 @@ def getquestiontuple(id):
     cursor.execute(sql, (id,))
     return cursor.fetchone()
 
+# Enter username + add to database and/or get user tuple
 username = input("Type your user name: ")
 usertuple = getusertuple(username)
 if usertuple is None:
@@ -70,15 +77,16 @@ if usertuple is None:
     database.commit()
     usertuple = getusertuple(username)
 
+# Check whether there are questions answered
 cursor.execute("SELECT COUNT(numofanswers) FROM questions")
 numofanswers = cursor.fetchone()
 print("Numofanswers: ", numofanswers)
-if numofanswers[0] == 0: # Er zijn geen antwoorden
+if numofanswers[0] == 0: # There are no questions made, assign default values
     totalaveragetime = starttime
     oppositetime = starttime
     suggestedquestionID = averagequestionID
     questiontuple = getquestiontuple(suggestedquestionID)
-else: # Er zijn antwoorden
+else: # There are questions made, calculate totalaveragetime
     cursor.execute("SELECT SUM(avgtime*numofanswers) FROM questions")
     totaltime = cursor.fetchone()
     cursor.execute("SELECT SUM(numofanswers) FROM questions")
@@ -87,53 +95,56 @@ else: # Er zijn antwoorden
     print("Totalnumofanswers: ", totalnumofanswers)
     totalaveragetime = totaltime[0]/float(totalnumofanswers[0])
 
+    # Check whether all questions have been answered at least once
     cursor.execute("SELECT id FROM questions WHERE avgtime IS NULL")
     result = cursor.fetchone()
-    if result is not None: # Er zijn niet gemaakte vragen
+    if result is not None: # There are questions not answered yet
         suggestedquestionID = result[0]
         questiontuple = getquestiontuple(suggestedquestionID)
-    else: # Alle vragen zijn gemaakt
-        if usertuple[2] is not None: # Gebruiker heeft vragen gemaakt
+    else: # All questions have been answered at least once
+        if usertuple[2] is not None: # User has answered some questions
             oppositetime = 2 * totalaveragetime - usertuple[2]
-        else: # Gebruiker heeft geen vragen gemaakt
+        else: # User has not answered any questions yet
             oppositetime = totalaveragetime
 
-        # Zoek de vraag het dichtst bij oppositetime (die niet al eerder gemaakt is door gebruiker)
+        # Search for the question whose average is closest to oppositetime, that has not been answered before by the user
         sql = "SELECT * FROM questions WHERE id NOT IN (SELECT DISTINCT question_id FROM answers WHERE user_id = %s) ORDER BY ABS(%s - avgtime) ASC LIMIT 1"
         cursor.execute(sql, (usertuple[0], oppositetime))
         questiontuple = cursor.fetchone()
-        if questiontuple is None: print("You have answered all questions")
+        if questiontuple is None:
+            print("You have answered all questions")
+            exit()
         else: suggestedquestionID = questiontuple[0]
 
+# Print intermediate values
 print("Totalaveragetime: ", totalaveragetime)
 print("Oppositetime: ", oppositetime)
 print("SuggestedquestionID: ", suggestedquestionID)
 print("Usertuple: ", usertuple)
 print("Questiontuple: ", questiontuple)
 
-if questiontuple is None: exit()
-
-# Reken penalty uit
+# Calculate penalty, global variables
 penalty = 0
 avgnumofpenalties = 0
-if questiontuple[8] is None: # Vraag is niet eerder gemaakt
+if questiontuple[8] is None: # Question has not been answered before
     avgnumofpenalties = 1.5
     penalty = totalaveragetime/avgnumofpenalties
-else: # Vraag is eerder gemaakt
+else: # Question has been answered before
     sql = "SELECT COUNT(answer) FROM answers WHERE question_id = %s"
     cursor.execute(sql, (questiontuple[0],))
     answers = cursor.fetchone()
     correctanswers = questiontuple[8]
     errors = answers[0] - correctanswers
-    if errors == 0: # Nog geen fouten gemaakt bij vraag
+    if errors == 0: # No errors have been made yet answering the question
         avgnumofpenalties = 1.5
-    else:   # Wel eerder fouten gemaakt
+    else:   # There have been errors made answering the question
         avgnumofpenalties = errors / correctanswers
     penalty = questiontuple[7] / avgnumofpenalties
+# Print intermediate values
 print("Penalty: ", penalty)
 print("Avgnumofpenalties: ", avgnumofpenalties)
 
-# Vraag maken
+# Answering the question
 answer = 0
 answers = []
 totaltime = 0
@@ -144,32 +155,33 @@ while answer != questiontuple[6]:
     print("Answers: ", answers)
     totaltime += timeelapsed
     if answer != questiontuple[6]: totaltime += penalty
+# Correct answer given, update database answers table
 sql = "INSERT INTO answers (user_id, question_id, answer, timeelapsed) VALUES (%s, %s, %s, %s)"
 cursor.executemany(sql, answers)
 database.commit()
 
-# Database updaten
+# Update database questions table
 sql = "UPDATE questions SET avgtime = %s, numofanswers = %s WHERE id = %s"
-if questiontuple[7] is None:
+if questiontuple[7] is None: # Question not answered before
     cursor.execute(sql, (totaltime, 1, questiontuple[0]))
-    database.commit()
-else:
+else: # Question answered before
     numofanswers = questiontuple[8]
     avgtime = questiontuple[7]
     totalanswertime = (numofanswers * avgtime + totaltime) / (numofanswers + 1)
     numofanswers += 1
     totalanswertime = round(totalanswertime, 1)
     cursor.execute(sql, (totalanswertime, numofanswers, questiontuple[0]))
-    database.commit()
+database.commit()
+
+# Update database users table
 sql = "UPDATE users SET avgtime = %s, numofquestions = %s WHERE id = %s"
-if usertuple[2] is None:
+if usertuple[2] is None: # User has not answered questions before
     cursor.execute(sql, (totaltime, 1, usertuple[0]))
-    database.commit()
-else:
+else: # User has answered questions before
     numofquestions = usertuple[3]
     avgtime = usertuple[2]
     totalquestiontime = (numofquestions * avgtime + totaltime) / (numofquestions + 1)
     numofquestions += 1
     totalquestiontime = round(totalquestiontime, 1)
     cursor.execute(sql, (totalquestiontime, numofquestions, usertuple[0]))
-    database.commit()
+database.commit()
