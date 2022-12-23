@@ -149,6 +149,11 @@ sql = "SELECT * FROM answers WHERE question_id = %s"
 cursor.execute(sql, (questiontuple[0],))
 answers = cursor.fetchall()
 print("Answers: ", answers)
+# Create list of valid answers and print it
+validanswers = []
+for shortanswer in answers:
+    validanswers.append(shortanswer[2])
+print("Validanswers: ", validanswers)
 
 # Answering the question, global variables
 shortanswer = 0
@@ -160,9 +165,12 @@ while shortanswer != questiontuple[2]: # While wrong answer submitted
     if len(answers) - 1 == len(answersgiven): # Check if only one answer remaining
         shortanswer = questiontuple[2] # Automatically give correct answer
         timeelapsed = 0 # No time elapsed when one answer (correct answer) remaining
-    else: # More than one answer remaining
+    else: # More than one answer remaining, check if valid answer given (if not continue)
         shortanswer = input("Submit your answer: ")
-        timeelapsed = round(float(input("Submit time elapsed before answering: ")), 1)    
+        timeelapsed = round(float(input("Submit time elapsed before answering: ")), 1)
+        if validanswers.count(shortanswer) != 1:
+            print("Invalid answer given")
+            continue
     if shortanswersgiven.count(shortanswer) == 1: # Check if earlier answer submitted
         print("Earlier answer submitted")
         continue
@@ -171,12 +179,17 @@ while shortanswer != questiontuple[2]: # While wrong answer submitted
         totaltime += timeelapsed # Calculate total timescore for question
         if shortanswer != questiontuple[2]: totaltime += penalty
 
-    # Add new answer given to answersgiven list
-    sql = "SELECT id FROM answers WHERE question_id = %s AND shortanswer = %s"
-    cursor.execute(sql, (questiontuple[0], shortanswer))    
-    answer_id = cursor.fetchone()
-    answersgiven.append((usertuple[0], questiontuple[0], answer_id[0], timeelapsed))
-    print("Answers given: ", answersgiven)
+        # Add new answer given to answersgiven list
+        sql = "SELECT id FROM answers WHERE question_id = %s AND shortanswer = %s"
+        cursor.execute(sql, (questiontuple[0], shortanswer))    
+        answer_id = cursor.fetchone()
+        answersgiven.append((usertuple[0], questiontuple[0], answer_id[0], timeelapsed))
+        print("Answers given: ", answersgiven)
+
+    # Break out of the loop if totaltime equal to or greater than worst score when guessing
+    if totaltime >= (len(answers) - 1) * penalty:
+        totaltime = (len(answers) - 1) * penalty
+        break  
 
 # Update database answersgiven table by inserting answersgiven list
 sql = "INSERT INTO answersgiven (user_id, question_id, answer_id, timeelapsed) VALUES (%s, %s, %s, %s)"
